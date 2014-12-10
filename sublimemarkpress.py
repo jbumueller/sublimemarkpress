@@ -144,14 +144,23 @@ class PublishCommand(sublime_plugin.TextCommand):
 
 		updated = False
 
+		publish = True
+
+		if content["post_status"] == "draft":
+			publish = False
+
 		proxy = xmlrpclib.ServerProxy(blog_settings["url"])
 		if post_id == None:
-			blog_id = 0 # not currently used on wordpress
-			post_id = proxy.metaWeblog.newPost(blog_id, blog_settings["username"], blog_settings["password"], content)
+			try:
+				blog_id = blog_settings["blog_id"]
+			except KeyError:
+				blog_id = 0
+
+			post_id = proxy.metaWeblog.newPost(blog_id, blog_settings["username"], blog_settings["password"], content, publish)
 			updated = True
 			print("created new:", post_id)
 		else:
-			proxy.metaWeblog.editPost(post_id, blog_settings["username"], blog_settings["password"], content)
+			proxy.metaWeblog.editPost(post_id, blog_settings["username"], blog_settings["password"], content, publish)
 			print("updated existing:", post_id)
 
 		return updated, post_id
