@@ -98,7 +98,11 @@ class PublishCommand(sublime_plugin.TextCommand):
 
 		can_markdown = False
 		try: 
-			import markdown2 # markdown
+			if int(sublime.version()) >= 3000:
+				from . import markdown2		
+			else:
+				import markdown2 # markdown
+
 			can_markdown = True
 		except ImportError:
 			can_markdown = False
@@ -130,7 +134,13 @@ class PublishCommand(sublime_plugin.TextCommand):
 			view.replace(edit, sublime.Region(0,0), post_header + "-->" + '\n')
 
 	def SaveToMetaWeblog(self, view, edit, post_id, blog_settings, content):
-		import xmlrpclib # wordpress
+		#In my ST3 xmlrpclib did not work, therefore I used xmlrpc.client.
+		if int(sublime.version()) >= 3000:
+			import xmlrpc.client
+			proxy = xmlrpc.client.ServerProxy(blog_settings["url"])
+		else:
+			import xmlrpclib
+			proxy = xmlrpclib.ServerProxy(blog_settings["url"])
 
 		updated = False
 
