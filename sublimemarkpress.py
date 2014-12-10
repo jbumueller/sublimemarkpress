@@ -5,11 +5,12 @@ class PublishCommand(sublime_plugin.TextCommand):
 		** Pushes the curent active file to a metaweblog compatible blog **
 
 		# blog settings
-		Relies on a settings file called "sublimemarkpress.sublime-settings" using the structure:
+		Relies on a settings file called "sublimemarkpress.sublime-settings" using the structure, where blog_id is optional. If blog_id is not set it is hanled as 0 integer:
 			{
 			    "xmlrpcurl": <URL to xml rpc endpoint>,
 			    "username": <username.,
 			    "password": <password>
+			    "blog_id" : <blog id> 
 			}
 
 		# tags
@@ -17,6 +18,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 		<!-- 
 		#post_id:<id of existing post - optional>
 		#tags:<comma delimited list of post tags - optional>
+		#categories:<comma delimited list of post categories - optional>
 		#status:<draft or publish - optional>
 		-->
 
@@ -33,7 +35,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 		header_lines = []
 		
 		# get the "header" (MB details)
-		post_id, tags, status, has_header_content = self.GetHeaderContent(all_lines_in_page, header_lines)
+		post_id, tags, categories, status, has_header_content = self.GetHeaderContent(all_lines_in_page, header_lines)
 
 		#title
 		title, is_markdown = self.GetTitle(self.view, all_lines_in_page, header_lines)
@@ -42,7 +44,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 		post_content = self.GetPostContent(self.view,all_lines_in_page, is_markdown)
 
 		# create request
-		content = self.BuildPostContent(self.view, {"content": post_content, "title": title, "tags": tags, "status": status})
+		content = self.BuildPostContent(self.view, {"content": post_content, "title": title, "tags": tags, "categories": categories, "status": status})
 
 		# save to MB
 		new_post, post_id = self.SaveToMetaWeblog(self.view, edit, post_id, self.LoadMetaBlogSettings(), content)
@@ -53,10 +55,10 @@ class PublishCommand(sublime_plugin.TextCommand):
 
 	def LoadMetaBlogSettings(self):
 		s = sublime.load_settings("sublimemarkpress.sublime-settings")
-		return {"url": s.get("xmlrpcurl"), "username": s.get("username"), "password": s.get("password")}
+		return {"url": s.get("xmlrpcurl"), "username": s.get("username"), "password": s.get("password"), "blog_id": s.get("blog_id")}
 
 	def GetHeaderContent(self, all_lines_in_page, header_lines):
-		page_info = {"has_header_content":False,"post_id":None, "tags":"", "status":""}
+		page_info = {"has_header_content":False,"post_id":None, "tags":"", "categories":[], "status":""}
 
 		if self.view.substr(all_lines_in_page[0]).startswith("<!--"):
 			page_info["has_header_content"] = True
@@ -71,6 +73,11 @@ class PublishCommand(sublime_plugin.TextCommand):
 			if self.view.substr(all_lines_in_page[0]).startswith("#tags"):
 				page_info["tags"] = self.view.substr(all_lines_in_page[0]).split(":")[1]
 				self.MoveCurrentLineToHeader(header_lines, all_lines_in_page)
+			
+			#post categories
+			if self.view.substr(all_lines_in_page[0]).startswith("#categories"):
+				page_info["categories"] = self.view.substr(all_lines_in_page[0]).split(":")[1].split(",")
+				self.MoveCurrentLineToHeader(header_lines, all_lines_in_page)
 
 			#post status
 			if self.view.substr(all_lines_in_page[0]).startswith("#status"):
@@ -78,7 +85,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 				self.MoveCurrentLineToHeader(header_lines, all_lines_in_page)
 
 			self.MoveCurrentLineToHeader(header_lines, all_lines_in_page) # removes the closing comment tag
-		return page_info["post_id"],page_info["tags"],page_info["status"],page_info["has_header_content"]
+		return page_info["post_id"],page_info["tags"],page_info["categories"],page_info["status"],page_info["has_header_content"]
 
 	def GetTitle(self, view, all_lines_in_page, header_lines):
 		is_markdown = False
@@ -118,7 +125,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 			all_lines_in_page.remove(all_lines_in_page[0])
 
 	def BuildPostContent(self, view, page_data):		
-		return {"description": page_data["content"], "post_content": page_data["content"], "title": page_data["title"], "mt_keywords": page_data["tags"], "post_status": page_data["status"]}
+		return {"description": page_data["content"], "post_content": page_data["content"], "title": page_data["title"], "mt_keywords": page_data["tags"], "categories": page_data["categories"], "post_status": page_data["status"]}
 
 	def CombineContent(self, view, lines):
 		return view.substr(sublime.Region(lines[0].begin(),lines[len(lines)-1].end()))
@@ -149,7 +156,6 @@ class PublishCommand(sublime_plugin.TextCommand):
 		if content["post_status"] == "draft":
 			publish = False
 
-		proxy = xmlrpclib.ServerProxy(blog_settings["url"])
 		if post_id == None:
 			try:
 				blog_id = blog_settings["blog_id"]
