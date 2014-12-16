@@ -1,4 +1,7 @@
 # Pushes the currently active SublimeText file to a metaweblog compatible blog
+## Warning: still work in progress
+- This project isn't tested yet.
+- These are my first steps on python so excuse if I do not follow all conventions.
 
 ## History
 This is a fork of https://github.com/rposbo/sublimemarkpress a Sublime Text 2 (ST2) plugin for posting content to Wordpress. I did like that approach pretty much, but had additional requirements therefore I built this fork.
