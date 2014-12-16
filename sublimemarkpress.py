@@ -1,4 +1,11 @@
 import sublime, sublime_plugin # sublime
+import sys, os, imp
+sys.path.append(os.path.dirname(__file__)) 
+sys.path.append(os.path.join(os.path.dirname(__file__), "python-markdown2"))
+from lib import markdown2
+
+import apiGateway
+apiGateway = imp.reload(apiGateway)
 
 class PublishCommand(sublime_plugin.TextCommand):
 	r""" 
@@ -8,9 +15,10 @@ class PublishCommand(sublime_plugin.TextCommand):
 		Relies on a settings file called "sublimemarkpress.sublime-settings" using the structure, where blog_id is optional. If blog_id is not set it is hanled as 0 integer:
 			{
 			    "xmlrpcurl": <URL to xml rpc endpoint>,
-			    "username": <username.,
-			    "password": <password>
-			    "blog_id" : <blog id> 
+			    "username": <username>,
+			    "password": <password>,
+			    "blog_id" : <blog id> (if not set a default value is used),
+			    "engine"  : <DotNetBlogEngine|WordPress|MovableType> (if not set plain MetaWeblog API is used)
 			}
 
 		# tags
@@ -21,7 +29,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 		#categories:<comma delimited list of post categories - optional>
 		#status:<draft or publish - optional>
 		-->
-
+ 
 		# title
 		blog title is the first line following that section; if it starts with "#" then it's assumed
 		to be a markdown post
@@ -30,6 +38,9 @@ class PublishCommand(sublime_plugin.TextCommand):
 		If the file "markdown2.py" from the awesome repo https://github.com/trentm/python-markdown2/tree/master/lib exists, markdown is enabled
 	"""
 	def run(self, edit):
+		self.blog_settings = apiGateway.LoadMetaBlogSettings()
+		self.blog_api = apiGateway.GetBlogApi()
+   
 		# get page content
 		all_lines_in_page = self.view.lines(sublime.Region(0, self.view.size()))
 		header_lines = []
@@ -42,21 +53,17 @@ class PublishCommand(sublime_plugin.TextCommand):
 
 		# get the "body" (content)
 		post_content = self.GetPostContent(self.view,all_lines_in_page, is_markdown)
-
+ 
 		# create request
 		content = self.BuildPostContent(self.view, {"content": post_content, "title": title, "tags": tags, "categories": categories, "status": status})
 
 		# save to MB
-		new_post, post_id = self.SaveToMetaWeblog(self.view, edit, post_id, self.LoadMetaBlogSettings(), content)
+		new_post, post_id = self.SaveToMetaWeblog(self.view, edit, post_id, content)
 
 		#  update active window with post id, if new
 		if new_post:
 			self.PrefixPostHeader(self.view, edit, post_id, header_lines, has_header_content)
-
-	def LoadMetaBlogSettings(self):
-		s = sublime.load_settings("sublimemarkpress.sublime-settings")
-		return {"url": s.get("xmlrpcurl"), "username": s.get("username"), "password": s.get("password"), "blog_id": s.get("blog_id")}
-
+ 
 	def GetHeaderContent(self, all_lines_in_page, header_lines):
 		page_info = {"has_header_content":False,"post_id":None, "tags":"", "categories":[], "status":""}
 
@@ -103,19 +110,20 @@ class PublishCommand(sublime_plugin.TextCommand):
 	def GetPostContent(self, view, all_lines_in_page, is_markdown):
 		post_content = self.CombineContent(self.view, all_lines_in_page)
 
-		can_markdown = False
-		try: 
-			if int(sublime.version()) >= 3000:
-				from . import markdown2		
-			else:
-				import markdown2 # markdown
+		# Can be dropped? Should not be required anymore as markdown2 is a submodule.
+		# can_markdown = False
+		# try: 
+		# 	if int(sublime.version()) >= 3000:
+		# 		from . import markdown2		
+		# 	else:
+		# 		import markdown2 # markdown
 
-			can_markdown = True
-		except ImportError:
-			can_markdown = False
+		# 	can_markdown = True
+		# except ImportError:
+		# 	can_markdown = False
 
 		# markdown content
-		if is_markdown and can_markdown:
+		if is_markdown: # and can_markdown:
 			post_content = str(markdown2.markdown(post_content,extras=["code-friendly"]))
 
 		return post_content
@@ -132,7 +140,7 @@ class PublishCommand(sublime_plugin.TextCommand):
 
 	def PrefixPostHeader(self, view, edit, post_id, header_lines, has_header):
 		post_header = "<!--" + '\n' + "#post_id:" + str(post_id) + '\n'
-
+ 
 		if has_header:
 			end_point = header_lines[1].begin()
 			header_lines.remove(header_lines[0])
@@ -140,33 +148,22 @@ class PublishCommand(sublime_plugin.TextCommand):
 		else:
 			view.replace(edit, sublime.Region(0,0), post_header + "-->" + '\n')
 
-	def SaveToMetaWeblog(self, view, edit, post_id, blog_settings, content):
-		#In my ST3 xmlrpclib did not work, therefore I used xmlrpc.client.
-		if int(sublime.version()) >= 3000:
-			import xmlrpc.client
-			proxy = xmlrpc.client.ServerProxy(blog_settings["url"])
-		else:
-			import xmlrpclib
-			proxy = xmlrpclib.ServerProxy(blog_settings["url"])
+	def RemoveFromMetaWeblog(self, post_id):
+		self.blog_api.delete_post(post_id)
 
+	def SaveToMetaWeblog(self, view, edit, post_id, content):
 		updated = False
-
 		publish = True
 
 		if content["post_status"] == "draft":
 			publish = False
-
+        
 		if post_id == None:
-			try:
-				blog_id = blog_settings["blog_id"]
-			except KeyError:
-				blog_id = 0
-
-			post_id = proxy.metaWeblog.newPost(blog_id, blog_settings["username"], blog_settings["password"], content, publish)
+			post_id = self.blog_api.new_post(content, publish, self.blog_settings["blog_id"])
 			updated = True
 			print("created new:", post_id)
 		else:
-			proxy.metaWeblog.editPost(post_id, blog_settings["username"], blog_settings["password"], content, publish)
+			self.blog_api.edit_post(post_id,content)
 			print("updated existing:", post_id)
 
 		return updated, post_id

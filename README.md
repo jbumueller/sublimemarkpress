@@ -1,29 +1,46 @@
-#Pushes the currently active SublimeText file to a metaweblog compatible blog
+# Pushes the currently active SublimeText file to a metaweblog compatible blog
 
-## blog settings
+## History
+This is a fork of https://github.com/rposbo/sublimemarkpress a Sublime Text 2 (ST2) plugin for posting content to Wordpress. I did like that approach pretty much, but had additional requirements therefore I built this fork.
+
+### What did change
+- Added support for ST3
+- ST2 Support is not tested, but it might be compatible
+- Added support for other blogging engines
+- In Addition to tags I added category assignment to post
+- Added an third party MetaWeblogApi Wrapper for Python (https://github.com/theatlantic/python-blogger)
+- Embeded markdown2 lib (https://github.com/trentm/python-markdown2) to plugin, no custom install needed anymore
+
+### What is going to change next
+- Add Sublime Text Command Palette
+- Completion for Tags and Categories
+- Delivery through PackageControl
+- Upload Images
+
+## Usage
+### Blog settings
 	Relies on a settings file called "sublimemarkpress.sublime-settings" using the structure:
 	{
 	    "xmlrpcurl": <URL to xml rpc endpoint>,
 	    "username": <username>,
-	    "password": <password>
+	    "password": <password>,
+	    "blog_id" : <blog id> (if not set a default value is used),
+	    "engine"  : <DotNetBlogEngine|WordPress|MovableType> (if not set plain MetaWeblog API is used)
 	}
 
-## tags
-	blog tags are optional at the top of the file in the structure:
+### Post settings
+	Blog tags are optional at the top of the file in the structure:
 	<!-- 
 	#post_id:<id of existing post - optional>
 	#tags:<comma delimited list of post tags - optional>
+	#categories:<comma delimited list of post categories - optional>
 	#status:<draft or publish - optional>
 	-->
 
-## title
-blog title is the first line following that section; if it starts with "#" then it's assumed
-to be a markdown post
+### Title
+Blog title is the first line following that section; if it starts with "#" then it's assumed to be a markdown post. Otherwise content is published without any preprocessing.
 
-## markdown
-If the file "markdown2.py" from the awesome repo https://github.com/trentm/python-markdown2/tree/master/lib exists, markdown is enabled
-
-## usage
+### Publishing
 Currently, you need to copy this file into the sublimetext packages/user directory. Then on the file you wish to post press ctrl+' and type "view.run_command('publish')"
 
 ## key mapping

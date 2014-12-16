@@ -1,3 +1,6 @@
 [submodule "python-markdown2"]
 	path = python-markdown2
 	url = https://github.com/trentm/python-markdown2.git
+[submodule "python-blogger"]
+	path = python-blogger
+	url = https://github.com/jbumueller/python-blogger.git
